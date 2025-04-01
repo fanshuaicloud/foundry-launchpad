@@ -1,0 +1,23 @@
+{
+    "local": {
+        "SalesFactory": "",
+        "FS-TOKEN": "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+        "MOCK-TOKEN": "",
+        "AllocationStakingProxy": "",
+        "ProxyAdmin": "",
+        "LPLP-TOKEN": "",
+        "Airdrop-C2N": "",
+        "FarmingC2N": ""
+    },
+    "sepolia": {
+        "BOBA-TOKEN": "",
+        "C2N-TOKEN": "",
+        "MOCK-TOKEN": "",
+        "Admin": "",
+        "SalesFactory": "",
+        "AllocationStakingProxy": "",
+        "ProxyAdmin": "",
+        "FarmingC2N": "",
+        "Airdrop-C2N": ""
+    }
+}
