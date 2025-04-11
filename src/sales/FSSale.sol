@@ -4,7 +4,6 @@ pragma solidity ^0.8.18;
 
 import {IAllocationStaking} from "../interfaces/IAllocationStaking.sol";
 import {ISalesFactory} from "../interfaces/ISalesFactory.sol";
-
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -12,11 +11,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-contract FSSale is ReentrancyGuard, Ownable {
+contract FSSale is ReentrancyGuard, Ownable, EIP712 {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
     using Math for uint256;
+
+    bytes32 private constant MESSAGE_TYPEHASH = keccak256("SaleClaim(address account,uint256 amount,address saleOwner)");
 
     IAllocationStaking public allocationStakingContract;
     ISalesFactory public factory;
@@ -86,6 +88,12 @@ contract FSSale is ReentrancyGuard, Ownable {
         bool[] isPortionWithdrawn;
     }
 
+    struct SaleClaim {
+        address account;
+        uint256 amount;
+        address saleOwner;
+    }
+
     event SaleCreated(
         address indexed saleOwner, uint256 tokenPriceInETH, uint256 amountOfTokensToSell, uint256 saleEnd
     );
@@ -138,7 +146,7 @@ contract FSSale is ReentrancyGuard, Ownable {
         _;
     }
 
-    constructor(address _allocationStaking) Ownable(msg.sender) {
+    constructor(address _allocationStaking) Ownable(msg.sender) EIP712("Sale", "1") {
         factory = ISalesFactory(msg.sender);
         allocationStakingContract = IAllocationStaking(_allocationStaking);
     }
@@ -287,8 +295,8 @@ contract FSSale is ReentrancyGuard, Ownable {
         sale.saleStart = starTime;
         emit StartTimeSet(sale.saleStart);
     }
-    //用户参与代币销售前的注册函数
 
+    //用户参与代币销售前的注册函数
     function registerForSale(bytes memory signature, uint256 pid) external {
         if (
             block.timestamp < registration.registrationTimeStarts || block.timestamp > registration.registrationTimeEnds
@@ -314,7 +322,7 @@ contract FSSale is ReentrancyGuard, Ownable {
 
     //验证用户注册请求签名有效性
     function checkRegistrationSignature(bytes memory signature, address user) public view returns (bool) {
-        bytes32 hash = keccak256(abi.encode(user, address(this)));
+        bytes32 hash = getMessageHash(user, 0, this.owner());
         address messageHash = ECDSA.recover(hash, signature);
         return (messageHash == this.owner());
     }
@@ -368,8 +376,8 @@ contract FSSale is ReentrancyGuard, Ownable {
 
         emit MaxParticipationSet(sale.maxParticipation);
     }
-    //销售方存入待售代币
 
+    //销售方存入待售代币
     function depositTokens() external onlySaleOwner {
         if (sale.tokensDeposited) {
             revert FSSale__DepositCanBeDoneOnlyOnce();
@@ -378,7 +386,7 @@ contract FSSale is ReentrancyGuard, Ownable {
         sale.token.safeTransferFrom(msg.sender, address(this), sale.amountOfTokensToSell);
     }
 
-    // Function to participate in the sales
+    // 参与销售的函数
     function participate(bytes memory signature, uint256 amount) external payable {
         if (amount > sale.maxParticipation) {
             revert FSSale__ParticipationAmountExceedsMaximum();
@@ -396,7 +404,6 @@ contract FSSale is ReentrancyGuard, Ownable {
         if (block.timestamp > sale.saleEnd) {
             revert FSSale__SaleEnded();
         }
-
         if (isParticipated[msg.sender]) {
             revert FSSale__AlreadyParticipated();
         }
@@ -408,7 +415,6 @@ contract FSSale is ReentrancyGuard, Ownable {
         }
         uint256 amountOfTokensBuying =
             (msg.value) * (uint256(10) ** IERC20Metadata(address(sale.token)).decimals()) / (sale.tokenPriceInETH);
-
         if (amountOfTokensBuying <= 0) {
             revert FSSale__CanNotBuyZeroTokens();
         }
@@ -541,7 +547,7 @@ contract FSSale is ReentrancyGuard, Ownable {
         view
         returns (address)
     {
-        bytes32 hash = keccak256(abi.encode(user, amount, address(this)));
+        bytes32 hash = getMessageHash(user, amount, this.owner());
         return ECDSA.recover(hash, signature);
     }
 
@@ -551,6 +557,16 @@ contract FSSale is ReentrancyGuard, Ownable {
 
     function getVestingInfo() external view returns (uint256[] memory, uint256[] memory) {
         return (vestingPortionsUnlockTime, vestingPercentPerPortion);
+    }
+
+    function getSatotalTokensSold() public view returns (uint256 totalTokensSold) {
+        return sale.totalTokensSold;
+    }
+
+    function getMessageHash(address account, uint256 amount, address saleOwner) public view returns (bytes32) {
+        return _hashTypedDataV4(
+            keccak256(abi.encode(MESSAGE_TYPEHASH, SaleClaim({account: account, amount: amount, saleOwner: saleOwner})))
+        );
     }
 
     receive() external payable {}

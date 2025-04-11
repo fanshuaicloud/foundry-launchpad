@@ -61,4 +61,8 @@ contract SalesFactory is Ownable {
         }
         return sales;
     }
+
+    function getAllocationStaking() external view returns (address) {
+        return allocationStaking;
+    }
 }

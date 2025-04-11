@@ -137,7 +137,7 @@ contract AllocationStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable
         if (_withUpdate) {
             massUpdatePools();
         }
-        totalAllocPoint -= poolInfo[_pid].allocPoint + _allocPoint;
+        totalAllocPoint = totalAllocPoint -poolInfo[_pid].allocPoint + _allocPoint;
         poolInfo[_pid].allocPoint = _allocPoint;
     }
 
@@ -187,9 +187,7 @@ contract AllocationStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable
         if (user.tokensUnlockTime > block.timestamp) {
             revert AllocationStaking__TokensAlreadyUnlocked();
         }
-
         user.tokensUnlockTime = _tokensUnlockTime;
-
         // 将销售添加到用户注册的销售数组中。
         user.salesRegistered.push(msg.sender);
     }
@@ -221,7 +219,7 @@ contract AllocationStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable
         uint256 depositAmount = _amount;
         updatePool(_pid);
 
-        // Transfer pending amount to user if already staking
+        //如果用户已经在质押，则将待领取的金额转移到用户账户
         if (user.amount > 0) {
             uint256 pendingAmount = user.amount * pool.accERC20PerShare / ACC_ERC20_PRECISION - user.rewardDebt;
             erc20Transfer(msg.sender, pendingAmount);
@@ -321,6 +319,12 @@ contract AllocationStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable
 
         return (deposits, earnings);
     }
+
+     function getPoolAllocPoint(uint256 _pid) public view returns(uint256 allocPoint){
+         return poolInfo[_pid].allocPoint;
+    }
+
+  
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

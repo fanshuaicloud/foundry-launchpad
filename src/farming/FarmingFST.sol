@@ -225,4 +225,10 @@ contract FarmingFST is Ownable {
         erc20.transfer(_to, _amount);
         paidOut += _amount;
     }
+
+    function getPoolAllocPoint(uint256 _pid) public view returns(uint256 allocPoint){
+         return poolInfo[_pid].allocPoint;
+    }
+
+    
 }
